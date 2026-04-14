@@ -14,9 +14,9 @@ type ImportResult = {
 type Summary = { registered: number; skipped: number; errors: number }
 
 // ----- CSVテンプレート定義 -----
-const BOOK_CSV_TEMPLATE = `title,author,publisher,isbn,asin,total_copies,tags,cover_url
-リーダーシップの本,著者名,出版社名,978-4-XXXXX,XXXXXXXXXX,1,ビジネス|リーダー,
-Clean Code,Robert C. Martin,Prentice Hall,978-0-13-235088-4,0132350882,2,技術|プログラミング,
+const BOOK_CSV_TEMPLATE = `amazon_url,total_copies,tags
+https://www.amazon.co.jp/dp/XXXXXXXXXX,1,ビジネス|リーダー
+https://www.amazon.co.jp/dp/0132350882,2,技術|プログラミング
 `
 
 const USER_CSV_TEMPLATE = `name,email,role
@@ -226,7 +226,7 @@ export default function ImportClient() {
       <UploadSection
         title="本の一括登録"
         icon="📚"
-        description="title, author, publisher, isbn, asin, total_copies, tags（|区切り）, cover_url"
+        description="amazon_url（必須）, total_copies（冊数）, tags（|区切り）— 書籍情報は自動取得"
         templateFilename="hondana_books_template.csv"
         templateContent={BOOK_CSV_TEMPLATE}
         endpoint="/api/admin/import/books"

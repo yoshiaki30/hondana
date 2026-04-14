@@ -3,11 +3,46 @@ import { auth } from '@/auth'
 import { getSupabaseAdmin } from '@/lib/supabase'
 
 // CSVテンプレートのカラム定義
-// title,author,publisher,isbn,asin,total_copies,tags,cover_url
-// ※ tags はカンマの代わりに「|」区切り（例: 技術|Python|入門）
+// amazon_url,total_copies,tags
+// amazon_url: AmazonのURL（必須）。ASINから書籍情報を自動取得
+// total_copies: 所有冊数（省略時 1）
+// tags: タグ（|区切り。例: 技術|Python|入門）
 
-// POST /api/admin/import/books
-// multipart/form-data: csv file
+function extractAsin(url: string): string | null {
+  const patterns = [/\/dp\/([A-Z0-9]{10})/, /\/gp\/product\/([A-Z0-9]{10})/, /\/ASIN\/([A-Z0-9]{10})/]
+  for (const p of patterns) {
+    const m = url.match(p)
+    if (m) return m[1]
+  }
+  return null
+}
+
+async function fetchBookInfo(asin: string): Promise<{
+  title: string; author: string; publisher: string; description: string; isbn: string; cover_url: string
+}> {
+  const cover_url = `https://images-na.ssl-images-amazon.com/images/P/${asin}.09.LZZZZZZZ.jpg`
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/books/v1/volumes?q=isbn:${asin}&maxResults=1`,
+      { next: { revalidate: 3600 } }
+    )
+    const data = await res.json()
+    if (data.items?.length > 0) {
+      const vol = data.items[0].volumeInfo
+      return {
+        title: vol.title ?? '',
+        author: vol.authors?.join(', ') ?? '',
+        publisher: vol.publisher ?? '',
+        description: vol.description ?? '',
+        isbn: vol.industryIdentifiers?.find((i: { type: string }) => i.type === 'ISBN_13')?.identifier
+          ?? vol.industryIdentifiers?.find((i: { type: string }) => i.type === 'ISBN_10')?.identifier ?? '',
+        cover_url,
+      }
+    }
+  } catch { /* fallback */ }
+  return { title: '', author: '', publisher: '', description: '', isbn: '', cover_url }
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -24,12 +59,10 @@ export async function POST(req: NextRequest) {
   const lines = text.split(/\r?\n/).filter((l) => l.trim())
   if (lines.length < 2) return NextResponse.json({ error: 'データ行がありません' }, { status: 400 })
 
-  // ヘッダー行をスキップ
   const rows = lines.slice(1)
 
-  // 既存書籍のタイトル一覧を取得（重複除外用）
-  const { data: existingBooks } = await supabase.from('books').select('title, asin, isbn')
-  const existingTitles = new Set((existingBooks ?? []).map((b: { title: string }) => b.title.trim()))
+  // 既存ASIN一覧（重複除外用）
+  const { data: existingBooks } = await supabase.from('books').select('asin, isbn')
   const existingAsins = new Set((existingBooks ?? []).filter((b: { asin: string | null }) => b.asin).map((b: { asin: string }) => b.asin.trim()))
   const existingIsbns = new Set((existingBooks ?? []).filter((b: { isbn: string | null }) => b.isbn).map((b: { isbn: string }) => b.isbn.trim()))
 
@@ -38,40 +71,49 @@ export async function POST(req: NextRequest) {
   for (const line of rows) {
     if (!line.trim()) continue
     const cols = parseCSVLine(line)
-    const [title = '', author = '', publisher = '', isbn = '', asin = '', total_copies_str = '1', tagsStr = '', cover_url = ''] = cols
+    const [amazonUrl = '', total_copies_str = '1', tagsStr = ''] = cols
 
-    if (!title.trim()) {
-      results.push({ title: '(空)', status: 'error', reason: 'タイトルが空です' })
+    const urlTrimmed = amazonUrl.trim()
+    if (!urlTrimmed) {
+      results.push({ title: '(空)', status: 'error', reason: 'Amazon URLが空です' })
       continue
     }
 
-    // 重複チェック（タイトル / ASIN / ISBN）
-    if (existingTitles.has(title.trim())) {
-      results.push({ title, status: 'skipped', reason: '同じタイトルが既に登録済み' })
+    const asin = extractAsin(urlTrimmed)
+    if (!asin) {
+      results.push({ title: urlTrimmed, status: 'error', reason: 'URLからASINを抽出できませんでした' })
       continue
     }
-    if (asin.trim() && existingAsins.has(asin.trim())) {
-      results.push({ title, status: 'skipped', reason: '同じASINが既に登録済み' })
+
+    // 重複チェック
+    if (existingAsins.has(asin)) {
+      results.push({ title: `ASIN: ${asin}`, status: 'skipped', reason: '既に登録済み（ASIN重複）' })
       continue
     }
-    if (isbn.trim() && existingIsbns.has(isbn.trim())) {
-      results.push({ title, status: 'skipped', reason: '同じISBNが既に登録済み' })
+
+    // Amazon/Google Books から書籍情報取得
+    const info = await fetchBookInfo(asin)
+
+    if (info.isbn && existingIsbns.has(info.isbn)) {
+      results.push({ title: info.title || `ASIN: ${asin}`, status: 'skipped', reason: '既に登録済み（ISBN重複）' })
       continue
     }
 
     const total_copies = Math.max(1, parseInt(total_copies_str.trim()) || 1)
+    const title = info.title || `（タイトル不明: ${asin}）`
 
     try {
       const { data: book, error } = await supabase
         .from('books')
         .insert({
-          title: title.trim(),
-          author: author.trim() || null,
-          publisher: publisher.trim() || null,
-          isbn: isbn.trim() || null,
-          asin: asin.trim() || null,
+          title,
+          author: info.author || null,
+          publisher: info.publisher || null,
+          isbn: info.isbn || null,
+          asin,
+          description: info.description || null,
+          cover_url: info.cover_url || null,
           total_copies,
-          cover_url: cover_url.trim() || null,
           created_by: session.user.id,
         })
         .select('id')
@@ -79,7 +121,7 @@ export async function POST(req: NextRequest) {
 
       if (error) throw new Error(error.message)
 
-      // タグ処理（| 区切り）
+      // タグ処理
       const tagNames = tagsStr.split('|').map((t) => t.trim()).filter(Boolean)
       for (const tagName of tagNames) {
         let tagId: string | null = null
@@ -93,10 +135,8 @@ export async function POST(req: NextRequest) {
         if (tagId) await supabase.from('book_tags').insert({ book_id: book.id, tag_id: tagId })
       }
 
-      existingTitles.add(title.trim())
-      if (asin.trim()) existingAsins.add(asin.trim())
-      if (isbn.trim()) existingIsbns.add(isbn.trim())
-
+      existingAsins.add(asin)
+      if (info.isbn) existingIsbns.add(info.isbn)
       results.push({ title, status: 'registered' })
     } catch (e: unknown) {
       results.push({ title, status: 'error', reason: e instanceof Error ? e.message : '登録エラー' })
@@ -110,7 +150,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ results, summary: { registered, skipped, errors } })
 }
 
-// 簡易CSVパーサー（ダブルクォート対応）
 function parseCSVLine(line: string): string[] {
   const cols: string[] = []
   let cur = ''
