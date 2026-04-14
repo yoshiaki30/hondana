@@ -77,8 +77,9 @@ export default function AppHeader({ userName, userImage, role, backHref }: Props
           </Link>
         )}
         <Link href="/" className="flex items-center gap-2">
-          <span className="text-[20px]">📚</span>
-          <span className="text-[17px] font-bold text-[#1A1A2E] tracking-tight">ホンダナ</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/kiwi-logo.png" alt="キウイ文庫" className="w-8 h-8 rounded-full object-cover" />
+          <span className="text-[17px] font-bold text-[#1A1A2E] tracking-tight">キウイ文庫</span>
         </Link>
         {role === 'admin' && (
           <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">

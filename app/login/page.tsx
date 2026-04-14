@@ -5,8 +5,9 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#F0F4F8] flex items-center justify-center px-4">
       <div className="bg-white rounded-3xl shadow-sm border border-[#E8ECF0] p-10 w-full max-w-sm text-center space-y-6">
         <div className="space-y-2">
-          <div className="text-5xl">📚</div>
-          <h1 className="text-[22px] font-bold text-[#1A1A2E] tracking-tight">ホンダナ</h1>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/kiwi-logo.png" alt="キウイ文庫" className="w-20 h-20 rounded-full object-cover mx-auto" />
+          <h1 className="text-[22px] font-bold text-[#1A1A2E] tracking-tight">キウイ文庫</h1>
           <p className="text-[13px] text-[#6B7280]">社内図書管理システム</p>
         </div>
 

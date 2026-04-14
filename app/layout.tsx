@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'ホンダナ',
+  title: 'キウイ文庫',
   description: '社内図書管理システム',
 }
 

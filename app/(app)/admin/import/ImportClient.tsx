@@ -227,7 +227,7 @@ export default function ImportClient() {
         title="本の一括登録"
         icon="📚"
         description="amazon_url（必須）, total_copies（冊数）, tags（|区切り）— 書籍情報は自動取得"
-        templateFilename="hondana_books_template.csv"
+        templateFilename="kiwibunko_books_template.csv"
         templateContent={BOOK_CSV_TEMPLATE}
         endpoint="/api/admin/import/books"
         sheetUrl={BOOK_SHEET_URL}
@@ -238,7 +238,7 @@ export default function ImportClient() {
         title="ユーザーの一括登録"
         icon="👥"
         description="name, email, role（admin または member）"
-        templateFilename="hondana_users_template.csv"
+        templateFilename="kiwibunko_users_template.csv"
         templateContent={USER_CSV_TEMPLATE}
         endpoint="/api/admin/import/users"
         sheetUrl={USER_SHEET_URL}
