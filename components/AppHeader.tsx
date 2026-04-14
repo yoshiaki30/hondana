@@ -107,6 +107,12 @@ export default function AppHeader({ userName, userImage, role, backHref }: Props
             >
               ユーザー管理
             </Link>
+            <Link
+              href="/admin/import"
+              className="text-[13px] font-semibold text-[#6B7280] hover:text-[#1A1A2E] hidden sm:inline"
+            >
+              一括インポート
+            </Link>
           </>
         )}
         <UserMenuDropdown userName={userName} userImage={userImage} />
