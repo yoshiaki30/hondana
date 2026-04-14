@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import type { Book, Tag } from '@/types'
@@ -15,8 +15,13 @@ const SPINE_COLORS = [
   '#6B2D8B', '#0B5345', '#1B4F72', '#4A235A',
 ]
 
-function SpineCard({ book }: { book: Book }) {
-  const [hovered, setHovered] = useState(false)
+type PopupPos = { x: number; y: number; book: Book } | null
+
+function SpineCard({ book, onHover, onLeave }: {
+  book: Book
+  onHover: (e: React.MouseEvent, book: Book) => void
+  onLeave: () => void
+}) {
   const isUnavailable = book.available_copies === 0
   const defaultColor = SPINE_COLORS[book.title.charCodeAt(0) % SPINE_COLORS.length]
   const bgColor = book.spine_color ?? defaultColor
@@ -26,10 +31,9 @@ function SpineCard({ book }: { book: Book }) {
       <div
         className="relative cursor-pointer"
         style={{ width: 64 }}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={(e) => onHover(e, book)}
+        onMouseLeave={onLeave}
       >
-        {/* 背表紙 */}
         <div
           className={`relative overflow-hidden rounded-sm transition-transform ${isUnavailable ? '' : 'hover:-translate-y-2'}`}
           style={{
@@ -58,16 +62,12 @@ function SpineCard({ book }: { book: Book }) {
                   textOrientation: 'mixed',
                   maxHeight: '156px',
                   overflow: 'hidden',
-                  display: '-webkit-box',
-                  WebkitBoxOrient: 'vertical',
                 }}
               >
                 {book.title}
               </span>
             </div>
           )}
-
-          {/* 貸出中オーバーレイ */}
           {isUnavailable && (
             <div className="absolute inset-0 flex items-center justify-center">
               <span
@@ -79,40 +79,23 @@ function SpineCard({ book }: { book: Book }) {
             </div>
           )}
         </div>
-
-        {/* ホバーポップアップ */}
-        {hovered && (
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-52 bg-white border border-[#E8ECF0] rounded-2xl shadow-xl p-3 text-sm pointer-events-none">
-            <p className="font-bold text-[#1A1A2E] text-[13px] line-clamp-2 leading-snug">{book.title}</p>
-            {book.author && <p className="text-[#6B7280] text-[12px] mt-1">{book.author}</p>}
-            <p className={`mt-1.5 text-[11px] font-semibold ${isUnavailable ? 'text-[#EA4335]' : 'text-[#34A853]'}`}>
-              {isUnavailable ? '貸出中' : `貸出可（残${book.available_copies}冊）`}
-            </p>
-            {book.tags && book.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {book.tags.map((t) => (
-                  <span key={t.id} className="bg-[#E8F0FE] text-[#1A73E8] text-[10px] px-1.5 py-0.5 rounded-full font-medium">
-                    {t.name}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </Link>
   )
 }
 
-function ShelfRow({ books }: { books: Book[] }) {
+function ShelfRow({ books, onHover, onLeave }: {
+  books: Book[]
+  onHover: (e: React.MouseEvent, book: Book) => void
+  onLeave: () => void
+}) {
   return (
     <div className="relative mb-6">
       <div className="flex gap-2 items-end px-4 pb-3 min-h-[190px] flex-wrap">
         {books.map((book) => (
-          <SpineCard key={book.id} book={book} />
+          <SpineCard key={book.id} book={book} onHover={onHover} onLeave={onLeave} />
         ))}
       </div>
-      {/* 棚板 */}
       <div
         className="h-3 w-full rounded-sm"
         style={{
@@ -129,6 +112,31 @@ const BOOKS_PER_ROW = 12
 export default function BookshelfClient({ books, tags }: Props) {
   const [search, setSearch] = useState('')
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
+  const [popup, setPopup] = useState<PopupPos>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
+
+  const handleHover = (e: React.MouseEvent, book: Book) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setPopup({ x: rect.left + rect.width / 2, y: rect.top, book })
+  }
+  const handleLeave = () => setPopup(null)
+
+  // ポップアップが画面端に出ないよう補正
+  const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({})
+  useEffect(() => {
+    if (!popup || !popupRef.current) return
+    const W = popupRef.current.offsetWidth
+    const H = popupRef.current.offsetHeight
+    let left = popup.x - W / 2
+    let top = popup.y - H - 12 + window.scrollY
+    // 上が足りなければ下に出す
+    if (popup.y - H - 12 < 0) {
+      top = popup.y + 180 + 8 + window.scrollY
+    }
+    // 左右ハミ出し補正
+    left = Math.max(8, Math.min(left, window.innerWidth - W - 8))
+    setPopupStyle({ left, top })
+  }, [popup])
 
   const filtered = books.filter((book) => {
     const q = search.toLowerCase()
@@ -163,9 +171,7 @@ export default function BookshelfClient({ books, tags }: Props) {
           className="flex-1 bg-transparent text-[14px] text-[#1A1A2E] placeholder-[#9CA3AF] focus:outline-none"
         />
         {search && (
-          <button onClick={() => setSearch('')} className="text-[#6B7280] hover:text-[#1A1A2E] text-[16px]">
-            ×
-          </button>
+          <button onClick={() => setSearch('')} className="text-[#6B7280] hover:text-[#1A1A2E] text-[16px]">×</button>
         )}
       </div>
 
@@ -198,12 +204,10 @@ export default function BookshelfClient({ books, tags }: Props) {
         </div>
       )}
 
-      {/* 本棚 */}
+      {/* 本棚（overflow-hidden を外す） */}
       <div
-        className="rounded-2xl overflow-hidden border border-[#E8ECF0] shadow-sm"
-        style={{
-          background: 'linear-gradient(160deg, #F5F0E8 0%, #EDE5D5 100%)',
-        }}
+        className="rounded-2xl border border-[#E8ECF0] shadow-sm"
+        style={{ background: 'linear-gradient(160deg, #F5F0E8 0%, #EDE5D5 100%)' }}
       >
         <div className="px-4 pt-5">
           {filtered.length === 0 ? (
@@ -213,16 +217,39 @@ export default function BookshelfClient({ books, tags }: Props) {
             </div>
           ) : (
             rows.map((row, i) => (
-              <ShelfRow key={i} books={row} />
+              <ShelfRow key={i} books={row} onHover={handleHover} onLeave={handleLeave} />
             ))
           )}
         </div>
       </div>
 
-      {/* 冊数 */}
       <p className="text-[12px] text-[#9CA3AF] text-right">
         {filtered.length}冊表示 / 全{books.length}冊
       </p>
+
+      {/* Fixedポップアップ（overflow制約の外） */}
+      {popup && (
+        <div
+          ref={popupRef}
+          className="fixed z-[9999] w-52 bg-white border border-[#E8ECF0] rounded-2xl shadow-xl p-3 pointer-events-none"
+          style={popupStyle}
+        >
+          <p className="font-bold text-[#1A1A2E] text-[13px] line-clamp-2 leading-snug">{popup.book.title}</p>
+          {popup.book.author && <p className="text-[#6B7280] text-[12px] mt-1">{popup.book.author}</p>}
+          <p className={`mt-1.5 text-[11px] font-semibold ${popup.book.available_copies === 0 ? 'text-[#EA4335]' : 'text-[#34A853]'}`}>
+            {popup.book.available_copies === 0 ? '貸出中' : `貸出可（残${popup.book.available_copies}冊）`}
+          </p>
+          {popup.book.tags && popup.book.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {popup.book.tags.map((t) => (
+                <span key={t.id} className="bg-[#E8F0FE] text-[#1A73E8] text-[10px] px-1.5 py-0.5 rounded-full font-medium">
+                  {t.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
