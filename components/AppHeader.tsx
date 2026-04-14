@@ -91,7 +91,7 @@ export default function AppHeader({ userName, userImage, role, backHref }: Props
           <>
             <Link
               href="/admin/books/new"
-              className="text-[13px] font-semibold text-[#1A73E8] hover:text-[#1557B0] hidden sm:inline"
+              className="text-[13px] font-semibold text-white bg-[#1A73E8] hover:bg-[#1557B0] px-3 py-1.5 rounded-xl transition-colors hidden sm:inline-flex items-center gap-1"
             >
               ＋ 本を登録
             </Link>
@@ -100,6 +100,12 @@ export default function AppHeader({ userName, userImage, role, backHref }: Props
               className="text-[13px] font-semibold text-[#6B7280] hover:text-[#1A1A2E] hidden sm:inline"
             >
               貸出管理
+            </Link>
+            <Link
+              href="/admin/users"
+              className="text-[13px] font-semibold text-[#6B7280] hover:text-[#1A1A2E] hidden sm:inline"
+            >
+              ユーザー管理
             </Link>
           </>
         )}
