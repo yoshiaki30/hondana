@@ -24,6 +24,9 @@ const USER_CSV_TEMPLATE = `name,email,role
 佐藤 花子,hanako.sato@example.com,admin
 `
 
+const BOOK_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1MkyLAKynCwRaCoN21YuuHGitFiLlqOeQgG2yQAIE6zg/edit'
+const USER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1_Dyt6LQCTN5Qdo870EBWrLFuE4XrX9vfIu7Fat_qMqc/edit'
+
 function downloadCSV(content: string, filename: string) {
   const bom = '\uFEFF' // Excel対応BOM
   const blob = new Blob([bom + content], { type: 'text/csv;charset=utf-8;' })
@@ -42,6 +45,7 @@ function UploadSection({
   templateFilename,
   templateContent,
   endpoint,
+  sheetUrl,
   onDone,
 }: {
   title: string
@@ -50,6 +54,7 @@ function UploadSection({
   templateFilename: string
   templateContent: string
   endpoint: string
+  sheetUrl?: string
   onDone: () => void
 }) {
   const [dragging, setDragging] = useState(false)
@@ -94,12 +99,24 @@ function UploadSection({
             <p className="text-[12px] text-[#9CA3AF]">{description}</p>
           </div>
         </div>
-        <button
-          onClick={() => downloadCSV(templateContent, templateFilename)}
-          className="flex items-center gap-1.5 text-[12px] font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] px-3 py-1.5 rounded-xl transition-colors"
-        >
-          📥 テンプレートDL
-        </button>
+        <div className="flex items-center gap-2">
+          {sheetUrl && (
+            <a
+              href={sheetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-[12px] font-semibold text-[#34A853] bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-xl transition-colors"
+            >
+              📊 スプシで編集
+            </a>
+          )}
+          <button
+            onClick={() => downloadCSV(templateContent, templateFilename)}
+            className="flex items-center gap-1.5 text-[12px] font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] px-3 py-1.5 rounded-xl transition-colors"
+          >
+            📥 CSVテンプレDL
+          </button>
+        </div>
       </div>
 
       {/* ドロップゾーン */}
@@ -213,6 +230,7 @@ export default function ImportClient() {
         templateFilename="hondana_books_template.csv"
         templateContent={BOOK_CSV_TEMPLATE}
         endpoint="/api/admin/import/books"
+        sheetUrl={BOOK_SHEET_URL}
         onDone={() => router.refresh()}
       />
 
@@ -223,6 +241,7 @@ export default function ImportClient() {
         templateFilename="hondana_users_template.csv"
         templateContent={USER_CSV_TEMPLATE}
         endpoint="/api/admin/import/users"
+        sheetUrl={USER_SHEET_URL}
         onDone={() => router.refresh()}
       />
     </div>
